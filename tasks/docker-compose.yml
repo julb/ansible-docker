@@ -1,0 +1,20 @@
+- name: docker-compose utility should be installed
+  ansible.builtin.get_url:
+    url: "{{ docker_compose_releases_url }}/{{ docker_compose_version }}/docker-compose-{{ docker_compose_arch }}"
+    dest: "{{ docker_compose_executable }}"
+    mode: 0755
+    owner: root
+    group: root
+    checksum: "sha256:{{ docker_compose_executable_sha256_checksum }}"
+
+- name: get docker-compose version
+  become: yes
+  ansible.builtin.shell: 
+    cmd: "{{ docker_compose_executable }} --version"
+  register: docker_compose_installed_version
+  changed_when: no
+
+- name: print installed docker-compose version
+  ansible.builtin.debug:
+    var: docker_compose_installed_version.stdout
+    verbosity: 1

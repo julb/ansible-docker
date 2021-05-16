@@ -1,0 +1,106 @@
+---
+- name: old docker legacy packages should be removed
+  become: yes
+  ansible.builtin.yum:
+    name: "{{ packages }}"
+    state: absent
+  vars:
+    packages:
+    - docker
+    - docker-client
+    - docker-client-latest
+    - docker-common
+    - docker-latest
+    - docker-latest-logrotate
+    - docker-logrotate
+    - docker-engine
+
+- name: update ip forwarding
+  become: yes
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: docker_ce_sysctl_enable_ip_forwarding
+
+- name: docker-ce yum repository should be installed
+  become: yes
+  ansible.builtin.template:
+    src: docker-ce.repo.j2
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: 0644
+    owner: root
+    group: root
+
+- name: docker-ce should be installed
+  become: yes
+  ansible.builtin.yum:
+    name: "{{ packages }}"
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+      - docker-ce-{{ docker_ce_version }}
+      - docker-ce-cli-{{ docker_ce_version }}
+      - containerd.io
+  notify:
+    - restart docker
+
+- name: docker-ce etc should be created
+  become: yes
+  ansible.builtin.file: 
+    path: /etc/docker
+    state: directory
+    mode: 0640
+
+- name: docker-ce daemon options should be set
+  become: yes
+  ansible.builtin.template: 
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: 0640
+  notify:
+    - restart docker
+
+- name: flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: docker-ce should be started and enabled at boot
+  become: yes
+  ansible.builtin.systemd: 
+    name: docker 
+    enabled: yes
+    state: started
+
+- name: get docker-ce version
+  become: yes
+  ansible.builtin.shell: 
+    cmd: docker --version
+  register: docker_ce_installed_version
+  changed_when: no
+
+- name: print installed docker-ce version
+  ansible.builtin.debug:
+    var: docker_ce_installed_version.stdout
+    verbosity: 1
+
+- name: get docker-ce group information
+  become: yes
+  ansible.builtin.getent: 
+    database: group
+    key: docker
+
+- name: set fact with docker group gid
+  ansible.builtin.set_fact:
+    docker_group_gid: "{{ getent_group.docker[1] | int }}"
+
+- name: print docker-ce group gid
+  ansible.builtin.debug:
+    var: docker_group_gid
+    verbosity: 1
+
+- name: install docker-compose
+  ansible.builtin.import_tasks: docker-compose.yml
+  tags: docker-compose

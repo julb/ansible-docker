@@ -1,0 +1,25 @@
+---
+# This is an example playbook to execute Ansible tests.
+
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: get docker systemd service status
+      become: yes
+      ansible.builtin.systemd:
+        name: docker.service
+        state: started
+      check_mode: yes
+      register: docker_systemd_status
+
+    - name: check docker systemd service is running
+      assert:
+        that:
+          - docker_systemd_status.status.ActiveState == 'active'
+          - docker_systemd_status.status.ExecMainCode == '0'
+          - docker_systemd_status.status.ExecMainStatus == '0'
+
+    - name: check docker-compose installed
+      ansible.builtin.shell: "docker-compose --version"
+      changed_when: no
