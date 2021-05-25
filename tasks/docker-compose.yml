@@ -9,7 +9,7 @@
 
 - name: get docker-compose version
   become: yes
-  ansible.builtin.shell: 
+  ansible.builtin.command: 
     cmd: "{{ docker_compose_executable }} --version"
   register: docker_compose_installed_version
   changed_when: no
